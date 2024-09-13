@@ -26,6 +26,14 @@ the current directory.
 - **Required**: `No`
 - **Type**: `string`
 
+### `list_files`
+
+- **Description**: List all the files after checkout(optional)
+  specified.
+- **Required**: `No`
+- **Type**: `boolean`
+- **Default**: `false`
+
 ## Example Usage
 
 You can call this reusable workflow from another workflow as follows:
