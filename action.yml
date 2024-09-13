@@ -5,79 +5,72 @@ branding:
   icon: 'git-commit'
   color: 'white'
 
-
 inputs:
   repo_url:
-    description: 'Repository url'
-    required: true  # Changed from 'required' to true for proper syntax
+    description: 'Repository URL'
+    required: true
     type: string
   branch:
     description: 'Branch to check out (optional)'
     required: false
     type: string
   directory:
-    description: 'Directory where the repository should be cloned (Optional)'
+    description: 'Directory where the repository should be cloned (optional)'
     required: false
     type: string
   list_files:
-    description: 'List all the files after checkout(optional)'
+    description: 'List all the files after checkout (optional)'
     required: false
     type: boolean
     default: false
 
-
-
 runs:
-  # Using composite actions allows multiple steps in a single action
   using: 'composite'
 
   steps:
-
     # Define environment variables
     - name: Define environment variables
-      shell: bash  # Specifying the shell to use (bash in this case)
+      shell: bash
       id: vars
       run: |
-        if [ -z "${{ inputs.branch }}" ]; then
-          echo "checkoutBranch=${{ github.ref_name }}" >> $GITHUB_ENV
-        else
-          echo "checkoutBranch=${{ inputs.branch }}" >> $GITHUB_ENV
-        fi
-        
         if [ -z "${{ inputs.directory }}" ]; then
           echo "targetDirectory=." >> $GITHUB_ENV
         else
-           echo "targetDirectory=${{ inputs.directory }}" >> $GITHUB_ENV
+          echo "targetDirectory=${{ inputs.directory }}" >> $GITHUB_ENV
         fi
-    
 
-    # Clone the request repository (using native git clone) where this commit happened
+    # Clone the request repository (using native git clone)
     - name: Clone the request repository - ${{ inputs.repo_url }}
-      shell: bash  # Specifying the shell to use (bash in this case)
+      shell: bash
       run: |
         echo ""
-        echo "Variables: BRANCH: [${{ env.checkoutBranch }}], DIRECTORY: [${{ env.targetDirectory }}]"
+        echo "Directory: [${{ env.targetDirectory }}]"
         echo ""
         echo "git cloning: ${{ inputs.repo_url }}"
-        git clone ${{ inputs.repo_url }} "$DIRECTORY"
+        git clone ${{ inputs.repo_url }} "${{ env.targetDirectory }}"
 
-
+    # Branch Checkout, only if the branch input is provided
     - name: Branch Checkout
-      shell: bash  # Specifying the shell to use (bash in this case)
+      if: inputs.branch != ''
+      shell: bash
       run: |
         echo ""
-        echo "git checking out ${{ env.checkoutBranch }} in ${{ env.targetDirectory }}"
-        git -C ${{ env.targetDirectory }} checkout ${{ env.checkoutBranch }}
+        echo "git checking out ${{ inputs.branch }} in ${{ env.targetDirectory }}"
+        git -C ${{ env.targetDirectory }} checkout ${{ inputs.branch }}
 
+    # Git Status
+    - name: Git Status
+      shell: bash
+      run: |
         echo ""
         echo "git status"
         git -C ${{ env.targetDirectory }} status
 
-
+    # List All Files after checkout, if the list_files input is true
     - name: List All Files after checkout
       if: inputs.list_files == 'true'
       shell: bash
       run: |
         echo ""
-        echo "list"
-        ls -lahR | grep -v '\.git'
+        echo "Listing all files in ${{ env.targetDirectory }}"
+        ls -lahR "${{ env.targetDirectory }}" | grep -v '\.git'
