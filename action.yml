@@ -5,52 +5,79 @@ branding:
   icon: 'git-commit'
   color: 'white'
 
-on:
-  workflow_call:
-    inputs:
-      repo_url:
-        description: 'Repository url'
-        required: true  # Changed from 'required' to true for proper syntax
-        type: string
-      branch:
-        description: 'Branch to check out (optional)'
-        required: false
-        type: string
-      directory:
-        description: 'Directory where the repository should be cloned (Optional)'
-        required: false
-        type: string
+
+inputs:
+  repo_url:
+    description: 'Repository url'
+    required: true  # Changed from 'required' to true for proper syntax
+    type: string
+  branch:
+    description: 'Branch to check out (optional)'
+    required: false
+    type: string
+  directory:
+    description: 'Directory where the repository should be cloned (Optional)'
+    required: false
+    type: string
+  list_files:
+    description: 'List all the files after checkout(optional)'
+    required: false
+    type: boolean
+    default: false
+
+
 
 runs:
   # Using composite actions allows multiple steps in a single action
   using: 'composite'
 
-  env:
-    BRANCH: ${{ inputs.branch || github.ref_name }}  # Default to the branch or tag that triggered the workflow if not specified
-    DIRECTORY: ${{ inputs.directory || '.' }}  # Default to current directory if not specified
-
   steps:
-    # Set up SSH to authenticate with GitHub (required for cloning private repositories)
-    - name: Set up SSH
-      uses: ajaxer-org/ssh-setup-action@1
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-        host: github.com
-        ssh-key-filename: id_rsa
+
+    # Define environment variables
+    - name: Define environment variables
+      shell: bash  # Specifying the shell to use (bash in this case)
+      id: vars
+      run: |
+        if [ -z "${{ inputs.branch }}" ]; then
+          echo "checkoutBranch=${{ github.ref_name }}" >> $GITHUB_ENV
+        else
+          echo "checkoutBranch=${{ inputs.branch }}" >> $GITHUB_ENV
+        fi
+        
+        if [ -z "${{ inputs.directory }}" ]; then
+          echo "targetDirectory=." >> $GITHUB_ENV
+        else
+           echo "targetDirectory=${{ inputs.directory }}" >> $GITHUB_ENV
+        fi
+    
 
     # Clone the request repository (using native git clone) where this commit happened
     - name: Clone the request repository - ${{ inputs.repo_url }}
       shell: bash  # Specifying the shell to use (bash in this case)
       run: |
         echo ""
-        echo "Variables: BRANCH: [$BRANCH], DIRECTORY: [$DIRECTORY]"
+        echo "Variables: BRANCH: [${{ env.checkoutBranch }}], DIRECTORY: [${{ env.targetDirectory }}]"
         echo ""
         echo "git cloning: ${{ inputs.repo_url }}"
         git clone ${{ inputs.repo_url }} "$DIRECTORY"
-        
+
+
+    - name: Branch Checkout
+      shell: bash  # Specifying the shell to use (bash in this case)
+      run: |
         echo ""
-        echo "git checking out $BRANCH"
-        git -C "$DIRECTORY" checkout "$BRANCH"
+        echo "git checking out ${{ env.checkoutBranch }} in ${{ env.targetDirectory }}"
+        git -C ${{ env.targetDirectory }} checkout ${{ env.checkoutBranch }}
+
         echo ""
         echo "git status"
-        git -C "$DIRECTORY" status
+        git -C ${{ env.targetDirectory }} status
+
+
+    - name: List All Files after checkout
+      if: inputs.list_files == 'true'
+      shell: bash
+      run: |
+        echo ""
+        echo "list"
+        ls -lahR | grep -v '\.git'
