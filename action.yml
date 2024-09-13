@@ -1,0 +1,56 @@
+name: 'Git Repository Clone Action'
+description: 'This GitHub Actions workflow allows you to clone a repository and check out a specific branch or tag. It is designed to be reusable across different workflows and repositories.'
+
+branding:
+  icon: 'git-commit'
+  color: 'white'
+
+on:
+  workflow_call:
+    inputs:
+      repo_url:
+        description: 'Repository url'
+        required: true  # Changed from 'required' to true for proper syntax
+        type: string
+      branch:
+        description: 'Branch to check out (optional)'
+        required: false
+        type: string
+      directory:
+        description: 'Directory where the repository should be cloned (Optional)'
+        required: false
+        type: string
+
+runs:
+  # Using composite actions allows multiple steps in a single action
+  using: 'composite'
+
+  env:
+    BRANCH: ${{ inputs.branch || github.ref_name }}  # Default to the branch or tag that triggered the workflow if not specified
+    DIRECTORY: ${{ inputs.directory || '.' }}  # Default to current directory if not specified
+
+  steps:
+    # Set up SSH to authenticate with GitHub (required for cloning private repositories)
+    - name: Set up SSH
+      uses: ajaxer-org/ssh-setup-action@1
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        host: github.com
+        ssh-key-filename: id_rsa
+
+    # Clone the request repository (using native git clone) where this commit happened
+    - name: Clone the request repository - ${{ inputs.repo_url }}
+      shell: bash  # Specifying the shell to use (bash in this case)
+      run: |
+        echo ""
+        echo "Variables: BRANCH: [$BRANCH], DIRECTORY: [$DIRECTORY]"
+        echo ""
+        echo "git cloning: ${{ inputs.repo_url }}"
+        git clone ${{ inputs.repo_url }} "$DIRECTORY"
+        
+        echo ""
+        echo "git checking out $BRANCH"
+        git -C "$DIRECTORY" checkout "$BRANCH"
+        echo ""
+        echo "git status"
+        git -C "$DIRECTORY" status
