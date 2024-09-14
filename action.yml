@@ -1,0 +1,76 @@
+name: 'Git Repository Clone Action'
+description: 'This GitHub Actions workflow allows you to clone a repository and check out a specific branch or tag. It is designed to be reusable across different workflows and repositories.'
+
+branding:
+  icon: 'git-commit'
+  color: 'white'
+
+inputs:
+  repo_url:
+    description: 'Repository URL'
+    required: true
+    type: string
+  branch:
+    description: 'Branch to check out (optional)'
+    required: false
+    type: string
+  directory:
+    description: 'Directory where the repository should be cloned (optional)'
+    required: false
+    type: string
+  list_files:
+    description: 'List all the files after checkout (optional)'
+    required: false
+    type: boolean
+    default: false
+
+runs:
+  using: 'composite'
+
+  steps:
+    # Define environment variables
+    - name: Define environment variables
+      shell: bash
+      id: vars
+      run: |
+        if [ -z "${{ inputs.directory }}" ]; then
+          echo "targetDirectory=." >> $GITHUB_ENV
+        else
+          echo "targetDirectory=${{ inputs.directory }}" >> $GITHUB_ENV
+        fi
+
+    # Clone the request repository (using native git clone)
+    - name: Clone the request repository - ${{ inputs.repo_url }}
+      shell: bash
+      run: |
+        echo ""
+        echo "Directory: [${{ env.targetDirectory }}]"
+        echo ""
+        echo "git cloning: ${{ inputs.repo_url }}"
+        git clone ${{ inputs.repo_url }} "${{ env.targetDirectory }}"
+
+    # Branch Checkout, only if the branch input is provided
+    - name: Branch Checkout
+      if: inputs.branch != ''
+      shell: bash
+      run: |
+        echo ""
+        echo "git checking out ${{ inputs.branch }} in ${{ env.targetDirectory }}"
+        git -C ${{ env.targetDirectory }} checkout ${{ inputs.branch }}
+
+    # Git Status
+    - name: Git Status
+      shell: bash
+      run: |
+        echo ""
+        echo "git status"
+        git -C ${{ env.targetDirectory }} status
+
+    # List All Files after checkout, if the list_files input is true
+    - name: List All Files after checkout
+      if: inputs.list_files == 'true'
+      shell: bash
+      run: |
+        echo ""
+        echo "Listing all files in ${{ env.targetDirectory }}"
+        ls -lahR "${{ env.targetDirectory }}" | grep -v '\.git'
