@@ -1,8 +1,7 @@
 # Git Repository Clone Action
 
-This workflow is designed to clone a GitHub repository and check out a specific branch or tag. If no branch is
-specified, it defaults to the branch or tag that triggered the workflow. If no directory is specified, it clones into
-the current directory.
+This GitHub Actions workflow allows you to clone a repository and check out a specific branch or tag. It is designed to
+be reusable across different workflows and repositories.
 
 ## Inputs
 
@@ -39,7 +38,16 @@ the current directory.
 You can call this reusable workflow from another workflow as follows:
 
 ```yaml
-uses: ajaxer-org/git-repo-clone-action@latest
-with:
-  repo_url: 'git@github.com:ajaxer-org/git-repo-clone-action.git'
+
+- name: setup ssh
+  uses: ajaxer-org/ssh-setup-action@v1
+  with:
+    ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    host: github.com
+    ssh-key-filename: id_ed25519  # Can customize the key file name if needed
+
+- name: Clone git repo
+  uses: ajaxer-org/git-repo-clone-action@latest
+  with:
+    repo_url: 'git@github.com:ajaxer-org/git-repo-clone-action.git'
 ```
