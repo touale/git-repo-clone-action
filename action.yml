@@ -1,5 +1,5 @@
 name: 'Git Repository Clone Action'
-description: 'This GitHub Actions workflow allows you to clone a repository and check out a specific branch or tag. It is designed to be reusable across different workflows and repositories.'
+description: 'This workflow is designed to clone a GitHub repository and check out a specific branch into specific directory'
 
 branding:
   icon: 'git-commit'
