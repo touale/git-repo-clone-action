@@ -36,9 +36,6 @@ jobs:
   clone-and-commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
-      
       - name: Git Repository Clone and Commit Action
         uses: ajaxer-org/ajaxer-org/git-repo-clone-action@latest
         with:
