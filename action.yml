@@ -146,4 +146,4 @@ runs:
 
         echo ""
         echo "Contents:"
-        find . -path './${{env.DIRECTORY}}/.git' -prune -o -type f -print | xargs ls -lahR
+        find "${{ env.DIRECTORY }}" -path "${{ env.DIRECTORY }}/.git" -prune -o -type f -print | xargs ls -lahR
