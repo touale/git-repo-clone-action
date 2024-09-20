@@ -1,5 +1,5 @@
-name: 'Git Repository Clone Action'
-description: 'This workflow is designed to clone a GitHub repository and check out a specific branch into specific directory'
+name: 'Git Repository Clone and Commit Action'
+description: 'This workflow clones a GitHub repository, checks out a branch, configures Git user settings, and signs commits/tags using SSH.'
 
 branding:
   icon: 'git-commit'
@@ -7,70 +7,143 @@ branding:
 
 inputs:
   repo_url:
-    description: 'Repository URL'
+    description: 'The Git repository SSH URL to clone.'
     required: true
-    type: string
-  branch:
-    description: 'Branch to check out (optional)'
-    required: false
-    type: string
+  ssh_private_key:
+    description: 'The SSH private key to access the repository.'
+    required: true
   directory:
-    description: 'Directory where the repository should be cloned (optional)'
+    description: 'The directory to clone the repository into (optional).'
     required: false
-    type: string
+    default: ''
+  ref:
+    description: 'The branch or tag to checkout (optional).'
+    required: false
   list_files:
-    description: 'List all the files after checkout (optional)'
+    description: 'List all the files after checkout (optional).'
     required: false
-    type: boolean
-    default: false
+    default: 'false'
+  user_name:
+    description: 'The Git user name for later commits (optional).'
+    required: false
+    default: 'GitHub Actions'
+  user_email:
+    description: 'The Git user email for later commits (optional).'
+    required: false
+    default: 'actions@github.com'
+  sign_commit:
+    description: 'Whether to sign commits and tags with the SSH key (optional).'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
-
   steps:
-    # Define environment variables
-    - name: Define environment variables
+    - name: 'Set Directory if not specified'
+      id: set_directory
       shell: bash
-      id: vars
       run: |
-        if [ -z "${{ inputs.directory }}" ]; then
-          echo "targetDirectory=." >> $GITHUB_ENV
+        if [[ -z "${{ inputs.directory }}" ]]; then
+          DIRECTORY=$(basename -s .git "${{ inputs.repo_url }}")
         else
-          echo "targetDirectory=${{ inputs.directory }}" >> $GITHUB_ENV
+          DIRECTORY="${{ inputs.directory }}"
+        fi
+        echo "DIRECTORY=$DIRECTORY" >> $GITHUB_ENV
+
+    - name: 'Echo Directory for Debugging'
+      shell: bash
+      run: echo "DIRECTORY=${{ env.DIRECTORY }}"
+
+    - name: 'Create Temporary SSH Key Directory in Home'
+      shell: bash
+      run: |
+        SSH_KEY_DIR="$HOME/.ssh/temp_keys"
+        mkdir -p "$SSH_KEY_DIR"
+        chmod 700 "$SSH_KEY_DIR"
+        echo "SSH_KEY_DIR=$SSH_KEY_DIR" >> $GITHUB_ENV
+
+    - name: 'Add SSH Key to the Temporary Directory'
+      shell: bash
+      run: |
+        UUID=$(uuidgen)
+        SSH_KEY_PATH="$SSH_KEY_DIR/${UUID}_id_rsa"
+        echo "${{ inputs.ssh_private_key }}" > "$SSH_KEY_PATH"
+        chmod 600 "$SSH_KEY_PATH"
+        echo "SSH_KEY_PATH=$SSH_KEY_PATH" >> $GITHUB_ENV
+
+    - name: 'Add GitHub to known_hosts (in Home)'
+      shell: bash
+      run: |
+        ssh-keyscan -H github.com >> "$SSH_KEY_DIR/known_hosts"
+        chmod 600 "$SSH_KEY_DIR/known_hosts"
+
+    - name: 'Create SSH Config for GitHub'
+      shell: bash
+      run: |
+        echo "Host github.com" > "$SSH_KEY_DIR/config"
+        echo "  IdentityFile $SSH_KEY_PATH" >> "$SSH_KEY_DIR/config"
+        echo "  StrictHostKeyChecking no" >> "$SSH_KEY_DIR/config"
+        echo "  UserKnownHostsFile $SSH_KEY_DIR/known_hosts" >> "$SSH_KEY_DIR/config"
+        echo "  IdentitiesOnly yes" >> "$SSH_KEY_DIR/config"
+        chmod 600 "$SSH_KEY_DIR/config"
+
+    - name: 'Clone the Repository (default branch)'
+      shell: bash
+      run: |
+        GIT_SSH_COMMAND="ssh -F $SSH_KEY_DIR/config" \
+        git clone "${{ inputs.repo_url }}" "${{ env.DIRECTORY }}"
+
+    - name: 'Check Clone Success'
+      shell: bash
+      run: |
+        if [ ! -d "${{ env.DIRECTORY }}/.git" ]; then
+          echo "Failed to clone repository."
+          exit 1
         fi
 
-    # Clone the request repository (using native git clone)
-    - name: Clone the request repository - ${{ inputs.repo_url }}
+    - name: 'Configure Git User at Repository Level'
       shell: bash
       run: |
-        echo ""
-        echo "Directory: [${{ env.targetDirectory }}]"
-        echo ""
-        echo "git cloning: ${{ inputs.repo_url }}"
-        git clone ${{ inputs.repo_url }} "${{ env.targetDirectory }}"
+        git -C ${{ env.DIRECTORY }} config user.name "${{ inputs.user_name }}"
+        git -C ${{ env.DIRECTORY }} config user.email "${{ inputs.user_email }}"
 
-    # Branch Checkout, only if the branch input is provided
-    - name: Branch Checkout
-      if: inputs.branch != ''
+    - name: 'Set SSH config for Git repository'
       shell: bash
       run: |
-        echo ""
-        echo "git checking out ${{ inputs.branch }} in ${{ env.targetDirectory }}"
-        git -C ${{ env.targetDirectory }} checkout ${{ inputs.branch }}
+        git -C ${{ env.DIRECTORY }} config core.sshCommand "ssh -F $SSH_KEY_DIR/config"
 
-    # Git Status
-    - name: Git Status
+    - name: 'Check if ref is provided and perform git checkout'
+      if: inputs.ref != ''
       shell: bash
       run: |
-        echo ""
-        echo "git status"
-        git -C ${{ env.targetDirectory }} status
+        git -C ${{ env.DIRECTORY }} fetch origin "${{ inputs.ref }}"
+        git -C ${{ env.DIRECTORY }} checkout "${{ inputs.ref }}"
 
-    # List All Files after checkout, if the list_files input is true
-    - name: List All Files after checkout
+    - name: 'Configure SSH Signing for Commits'
+      if: inputs.sign_commit == 'true'
+      shell: bash
+      run: |
+        git -C ${{ env.DIRECTORY }} config gpg.format ssh
+        git -C ${{ env.DIRECTORY }} config user.signingkey "${SSH_KEY_PATH}"
+        git -C ${{ env.DIRECTORY }} config commit.gpgSign true
+
+    - name: 'Sign and Commit Changes (if needed)'
+      if: inputs.sign_commit == 'true'
+      shell: bash
+      run: |
+        git -C ${{ env.DIRECTORY }} add .
+        if ! git -C ${{ env.DIRECTORY }} commit -S -m "Automated commit signed with SSH"; then
+          echo "No changes to commit."
+        fi
+
+    - name: Echo contents of cloned repo
       if: inputs.list_files == 'true'
       shell: bash
       run: |
+        echo "Repo: [${{ inputs.repo_url }}]"
+        echo "Ref: [${{ inputs.ref }}]"
+        echo "Dir: [${{ env.DIRECTORY }}]"
+
         echo ""
-        echo "Listing all files in ${{ env.targetDirectory }}"
-        ls -lahR "${{ env.targetDirectory }}" | grep -v '\.git'
+        echo "Contents:"
+        find . -path './${{env.DIRECTORY}}/.git' -prune -o -type f -print | xargs ls -lahR

@@ -1,53 +1,53 @@
-# Git Repository Clone Action
+# Git Repository Clone and Commit Action
 
-This GitHub Actions workflow allows you to clone a repository and check out a specific branch or tag. It is designed to
-be reusable across different workflows and repositories.
+This GitHub Action allows you to clone a GitHub repository, check out a specific branch or tag, configure Git user
+settings, and sign commits/tags using an SSH key. It's designed to streamline the process of managing repositories in
+automated workflows.
+
+## Features
+
+- Clone a GitHub repository using SSH.
+- Check out a specific branch or tag.
+- Configure Git user.name and user.email for commits.
+- Optionally sign commits and tags using an SSH key.
+- List the contents of the cloned repository.
 
 ## Inputs
 
-### `repo_url`
+| Input             | Description                                        | Required | Default                |
+|-------------------|----------------------------------------------------|----------|------------------------|
+| `repo_url`        | The Git repository SSH URL to clone.               | Yes      |                        |
+| `ssh_private_key` | The SSH private key to access the repository.      | Yes      |                        |
+| `directory`       | The directory to clone the repository into.        | No       | Current directory name |
+| `ref`             | The branch or tag to checkout.                     | No       |                        |
+| `list_files`      | List all the files after checkout.                 | No       | `false`                |
+| `user_name`       | The Git user name for later commits.               | No       | `GitHub Actions`       |
+| `user_email`      | The Git user email for later commits.              | No       | `actions@github.com`   |
+| `sign_commit`     | Whether to sign commits and tags with the SSH key. | No       | `true`                 |
 
-- **Description**: The URL of the repository to clone.
-- **Required**: `Yes`
-- **Type**: `string`
-
-### `branch`
-
-- **Description**: The branch or tag to check out. If not specified, defaults to the branch or tag that triggered the
-  workflow.
-- **Required**: `No`
-- **Type**: `string`
-
-### `directory`
-
-- **Description**: The directory where the repository should be cloned. Defaults to the current directory (`.`) if not
-  specified.
-- **Required**: `No`
-- **Type**: `string`
-
-### `list_files`
-
-- **Description**: List all the files after checkout(optional)
-  specified.
-- **Required**: `No`
-- **Type**: `boolean`
-- **Default**: `false`
-
-## Example Usage
-
-You can call this reusable workflow from another workflow as follows:
+## Usage
 
 ```yaml
+name: Example Workflow
 
-- name: setup ssh
-  uses: ajaxer-org/ssh-setup-action@v1
-  with:
-    ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-    host: github.com
-    ssh-key-filename: id_ed25519  # Can customize the key file name if needed
+on: [push]
 
-- name: Clone git repo
-  uses: ajaxer-org/git-repo-clone-action@latest
-  with:
-    repo_url: 'git@github.com:ajaxer-org/git-repo-clone-action.git'
+jobs:
+  clone-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+      
+      - name: Git Repository Clone and Commit Action
+        uses: ajaxer-org/ajaxer-org/git-repo-clone-action@latest
+        with:
+          repo_url: 'git@github.com:your-username/your-repo.git'
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          directory: 'your-directory'
+          ref: 'main'
+          list_files: 'true'
+          user_name: 'Your Name'
+          user_email: 'your-email@example.com'
+          sign_commit: 'true'
 ```
