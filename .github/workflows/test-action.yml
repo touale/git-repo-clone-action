@@ -1,0 +1,76 @@
+name: Test SSH Clone Action
+
+on:
+  push:
+    branches:
+      - '*'
+  workflow_dispatch:
+
+
+jobs:
+
+  test-with-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Clone Action
+        uses: ajaxer-org/git-repo-clone-action@development
+        with:
+          repo_url: 'git@github.com:ajaxer-org/test-repo.git'
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          directory: 'test-repo'
+          ref: 'master'
+          list_files: 'true'
+
+      - name: 'Adding files'
+        run: |
+          UUID=$(uuidgen)
+          echo "$UUID" > "./test-repo/$UUID.txt"
+          git -C ./test-repo add .
+          git -C ./test-repo commit -m "added $UUID"
+          git -C ./test-repo push origin
+
+  test-without-ref:
+    needs: test-with-ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Clone Action
+        uses: ajaxer-org/git-repo-clone-action@development
+        with:
+          repo_url: 'git@github.com:ajaxer-org/test-repo.git'
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          directory: 'test-repo-dir'
+          list_files: 'true'
+          user_name: 'Ajaxer Developers'
+          user_email: '111728490+ajaxer-developers@users.noreply.github.com'
+
+      - name: 'Adding files'
+        run: |
+          UUID=$(uuidgen)
+          echo "$UUID" > "./test-repo-dir/$UUID.txt"
+          git -C ./test-repo-dir add .
+          git -C ./test-repo-dir commit -m "added $UUID"
+          git -C ./test-repo-dir push origin
+
+
+  test-without-directory:
+    needs: test-without-ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Clone Action
+        uses: ajaxer-org/git-repo-clone-action@development
+        with:
+          repo_url: 'git@github.com:ajaxer-org/test-repo.git'
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          list_files: 'true'
+          user_name: 'Ajaxer Developers'
+          user_email: '111728490+ajaxer-developers@users.noreply.github.com'
+
+
+      - name: 'Adding files'
+        run: |
+          UUID=$(uuidgen)
+          echo "$UUID" > "./test-repo/$UUID.txt"
+          git -C ./test-repo add .
+          git -C ./test-repo commit -m "added $UUID"
+          git -C ./test-repo push origin
+
